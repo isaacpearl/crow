@@ -35,7 +35,7 @@ end
 -- myAsl.action = <asl script>
 -- this is a *private* method
 -- FIXME should be local?
-function Asl:set_action( co )
+local function set_action( self, co )
     if type(co) == 'table' then -- needs to be wrapped in a coroutine
         self.co = asl_coroutine( co )
     else
@@ -52,10 +52,10 @@ end
 -- myAsl:action() and optional state arg for 'held' interaction
 -- this is a *private* method
 -- FIXME should be local?
-function Asl:do_action( dir )
+local function do_action( self, dir )
     local t = type(dir)
     if t == 'table' or t == 'thread' then
-        Asl.set_action(self,dir) -- assign new action. dir is an ASL!
+        set_action(self,dir) -- assign new action. dir is an ASL!
         dir = true           -- call it!
     end
     dir = dir or true -- default to rising action
@@ -87,14 +87,14 @@ end
 --- METAMETHODS
 -- asign to the member 'action' to compile an asl script to a coroutine
 Asl.__newindex = function(self, ix, val)
-    if ix == 'action' then Asl.set_action( self, val) end
+    if ix == 'action' then set_action( self, val) end
 end
 
 -- call the member 'action' to start the asl coroutine
 --   if called w a table arg, treat it as a new ASL to run immediately
 Asl.__index = function(self, ix)
     if ix == 'action' then
-        return function(self,a) Asl.do_action(self,a) end
+        return function(self,a) do_action(self,a) end
     elseif ix == 'step' then return Asl.step
     elseif ix == 'init' then return Asl.init end
 end
