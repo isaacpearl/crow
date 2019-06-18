@@ -15,6 +15,7 @@ function Asl.new(id)
     asl.in_hold = false    -- is eval currently in a held construct
     asl.locked  = false    -- flag to lockout bangs during lock{}
     asl.cc      = false    -- flag for whether coroutine can be continued
+    asl.seek    = false    -- flag whether we're changing instruction pointer
     setmetatable( asl, Asl )
     return asl
 end
@@ -25,6 +26,7 @@ function Asl:init() -- reset to defaults
     self.in_hold = false  -- is eval currently in a held construct
     self.locked  = false  -- flag to lockout bangs during lock{}
     self.cc      = false
+    self.seek    = false
     return self     -- functional style
 end
 
@@ -44,6 +46,11 @@ local function set_action( self, co )
     self.hold   = false
     self.locked = false
     self.cc     = true -- ready to coroutine!
+    self.seek   = false
+end
+
+local function goto_release(self)
+    print'TODO goto_release'
 end
 
 -- INTERPRETER
@@ -55,11 +62,32 @@ end
 local function do_action( self, dir )
     local t = type(dir)
     if t == 'table' or t == 'thread' then
-        set_action(self,dir) -- assign new action. dir is an ASL!
-        dir = true           -- call it!
+        self:set_action(dir) -- assign new action. dir is an ASL!
+        self.hold = true
+    elseif t == 'string' then
+        if     dir == '' or dir == 'start' then
+            self.hold = true
+            print'TODO empty string'
+        elseif dir == 'pause'   then print'TODO pause'
+        elseif dir == 'restart' or dir == 'attack' then
+            self.hold = true
+            print'TODO restart'
+        elseif dir == 'release' then print'TODO release'
+            self.hold = false
+            if self.in_hold then self:goto_release() end
+        elseif dir == 'step'    then self:step();print'TODO step'; return
+        elseif dir == 'leave'   then print'TODO leave'
+        elseif dir == 'freeze'  then print'TODO freeze'
+        else print'ERROR unmatched string'
+        end
+    elseif t == 'bool' then
+        if dir then print'TODO attack'
+        else print'TODO release'
+        end
+        self.hold = dir
+    else self.hold = true -- nil
     end
-    dir = dir or true -- default to rising action
-    self.hold = dir
+
     if self.co ~= nil then
         if self.locked ~= true then
             self.cc = true -- reactivate if finished
@@ -121,9 +149,14 @@ function toward( dest, time, shape )
     end
     return coroutine.create(function( self )
         while true do
-            if d == 'here' then d = LL_get_state( self.id ) end
-            LL_toward( self.id, d, t, s )
-            coroutine.yield( (t ~= 0) and 'wait' or nil )
+            if self.seek then
+                print'seeking'
+                coroutine.yield( 'seek' )
+            else
+                if d == 'here' then d = LL_get_state( self.id ) end
+                LL_toward( self.id, d, t, s )
+                coroutine.yield( (t ~= 0) and 'wait' or nil )
+            end
         end
     end)
 end
@@ -152,6 +185,7 @@ end
 function asl_if( fn_to_bool, fns )
     return coroutine.create(function( self )
         while true do
+            print'~if~'
             if fn_to_bool( self ) then
                 seq_coroutines( self, fns, 1 )
             end
@@ -164,7 +198,9 @@ function asl_wrap( enter_fn, fns, exit_fn )
     return coroutine.create(function( self )
         while true do
             enter_fn( self )
+            print'inside'
             seq_coroutines( self, fns, 1 )
+            print'~side'
             exit_fn( self )
             coroutine.yield('exit')
         end
@@ -196,11 +232,11 @@ function lock( fns )
 end
 
 function held( fns )
-    return asl_wrap( function( self ) self.in_hold = true end
-                   , asl_if( function( self ) return self.hold end
+    return asl_wrap( function( self ) print'>';self.in_hold = true end
+                   , asl_coroutine(asl_if( function( self ) print'?';return self.hold end
                            , fns
-                           )
-                   , function( self ) self.in_hold = false end
+                           ))
+                   , function( self ) print'<';self.in_hold = false end
                    )
 end
 

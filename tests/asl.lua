@@ -286,18 +286,18 @@ function run_tests()
           )
 
     _t.run( 'TODO held{}'
-          , function(count)
+          , function(...)
+                local t = {...}
                 local sl = Asl.new(1)
-                sl.action = loop{ toward( 1,1 )
+                sl.action = held{ toward( 3,3 )
                                 , toward( 2,2 )
                                 }
-                sl:action()
-                for i=1,count do sl:step() end
+                for i=1,#t do sl:action(t[i]) end
                 return get_last_toward()
             end
-          , {0, {0,1,1,'linear'}}
-          , {1, {1,2,2,'linear'}}
-          , {2, {1,1,1,'linear'}}
+          , {{'','step','step'}, {1,1,1,'linear'}}
+          , {{'restart'}, {1,1,1,'linear'}}
+          , {{'release'}, {1,1,1,'linear'}}
           )
 
 
